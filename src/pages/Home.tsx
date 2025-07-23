@@ -57,7 +57,6 @@ const Home: React.FC = () => {
     useInvoice();
 
   const [showMenu, setShowMenu] = useState(false);
-  const [device] = useState(AppGeneral.getDeviceType());
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastColor, setToastColor] = useState<
@@ -217,7 +216,7 @@ const Home: React.FC = () => {
           console.log("Loaded existing default file from local storage");
         } else {
           // If no default file exists, initialize with template data and save it
-          const data = DATA["home"][device]["msc"];
+          const data = DATA["home"]["default"]["msc"];
           AppGeneral.initializeApp(JSON.stringify(data));
 
           // Save the initial template as the default file
@@ -238,7 +237,7 @@ const Home: React.FC = () => {
         }
 
         // Fallback to template initialization
-        const data = DATA["home"][device]["msc"];
+        const data = DATA["home"]["default"]["msc"];
         AppGeneral.initializeApp(JSON.stringify(data));
         AppGeneral.changeSheetColor("#000000");
       }
@@ -393,7 +392,7 @@ const Home: React.FC = () => {
     }
   }, [isDarkMode, activeFontColor]);
 
-  const footers = DATA["home"][device]["footers"];
+  const footers = DATA["home"]["default"]["footers"];
   const footersList = footers.map((footerArray) => {
     const isActive = footerArray.index === billType;
 

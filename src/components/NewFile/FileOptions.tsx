@@ -172,7 +172,7 @@ const FileOptions: React.FC<FileOptionsProps> = ({
 
         // Decode the stored content
         const storedContent = decodeURIComponent(storedDefaultFile.content);
-        const msc = DATA["home"][device]["msc"];
+        const msc = DATA["home"]["default"]["msc"];
 
         const hasUnsavedChanges = storedContent !== JSON.stringify(msc);
 
@@ -198,7 +198,7 @@ const FileOptions: React.FC<FileOptionsProps> = ({
       // Set selected file to "default"
       updateSelectedFile("default");
 
-      const msc = DATA["home"][device]["msc"];
+      const msc = DATA["home"]["default"]["msc"];
 
       // Load the template data into the spreadsheet
       AppGeneral.viewFile("default", JSON.stringify(msc));
@@ -307,7 +307,7 @@ const FileOptions: React.FC<FileOptionsProps> = ({
 
         // reset default file
         if (selectedFile === "default") {
-          const msc = DATA["home"][device]["msc"];
+          const msc = DATA["home"]["default"]["msc"];
           const templateContent = encodeURIComponent(JSON.stringify(msc));
           const newDefaultFile = new File(
             now,
@@ -845,12 +845,12 @@ const FileOptions: React.FC<FileOptionsProps> = ({
 
   const handleAddSignature = async (signature_url: string) => {
     try {
-      // Get the correct logo coordinates based on device type
+      // Get the correct signature coordinates based on device type
       const signatureCoordinates = AppGeneral.getSignatureCoordinates();
       console.log("Using signature coordinates:", signatureCoordinates);
 
-      // Add logo with proper coordinate object and direct URL
-      await AppGeneral.addLogo(signatureCoordinates, signature_url);
+      // Add signature with proper coordinate object and direct URL
+      await AppGeneral.addSignature(signatureCoordinates, signature_url);
 
       console.log("Signature added successfully with direct URL");
       setToastMessage("Signature added successfully!");
@@ -904,7 +904,7 @@ const FileOptions: React.FC<FileOptionsProps> = ({
       );
 
       // Remove signature with proper coordinate object
-      AppGeneral.removeLogo(signatureCoordinates)
+      AppGeneral.removeSignature(signatureCoordinates)
         .then(() => {
           console.log("Signature removed successfully");
           setShowSignatureModal(false);

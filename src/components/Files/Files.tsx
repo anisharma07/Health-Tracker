@@ -111,7 +111,7 @@ const Files: React.FC<{
 
           // Decode the stored content
           const storedContent = decodeURIComponent(storedDefaultFile.content);
-          const msc = DATA["home"][device]["msc"];
+          const msc = DATA["home"]["default"]["msc"];
 
           const hasUnsavedChanges = storedContent !== JSON.stringify(msc);
           if (hasUnsavedChanges) {
