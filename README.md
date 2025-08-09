@@ -237,10 +237,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Spreadsheet functionality by [SocialCalc](https://socialcalc.org/)
 - PWA capabilities with [Vite PWA Plugin](https://vite-pwa-org.netlify.app/)
 
-## 📞 Support
-
-For support, email [anirudhcsharma@gmail.com] or create an issue in this repository.
-
 ---
 
 **Made with ❤️ for Government Agencies and Public Sector Organizations**
