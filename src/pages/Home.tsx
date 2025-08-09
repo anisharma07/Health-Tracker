@@ -20,6 +20,12 @@ import {
   IonCardContent,
   IonSegment,
   IonSegmentButton,
+  IonSelect,
+  IonSelectOption,
+  IonItem,
+  IonFab,
+  IonFabButton,
+  IonSpinner,
   isPlatform,
 } from "@ionic/react";
 import { APP_NAME, DATA } from "../app-data";
@@ -37,26 +43,37 @@ import {
   textOutline,
   ellipsisVertical,
   shareSharp,
+  cloudDownloadOutline,
+  wifiOutline,
+  downloadOutline,
+  add,
+  todayOutline,
+  scaleOutline,
 } from "ionicons/icons";
 import "./Home.css";
-import FileOptions from "../components/NewFile/FileOptions";
+import FileOptions from "../components/FileMenu/FileOptions";
 import Menu from "../components/Menu/Menu";
+import PWAInstallPrompt from "../components/PWAInstallPrompt";
+import { usePWA } from "../hooks/usePWA";
 import { useTheme } from "../contexts/ThemeContext";
 import { useInvoice } from "../contexts/InvoiceContext";
+// import WalletConnection from "../components/wallet/WalletConnection";
 import {
   isDefaultFileEmpty,
   generateUntitledFilename,
   isQuotaExceededError,
   getQuotaExceededMessage,
 } from "../utils/helper";
-import { cloudService } from "../services/cloud-service";
+// import { cloudService } from "../services/cloud-service";
 
 const Home: React.FC = () => {
   const { isDarkMode } = useTheme();
   const { selectedFile, billType, store, updateSelectedFile, updateBillType } =
     useInvoice();
+  const { isInstallable, isInstalled, isOnline, installApp } = usePWA();
 
   const [showMenu, setShowMenu] = useState(false);
+  const [device] = useState(AppGeneral.getDeviceType());
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastColor, setToastColor] = useState<
@@ -78,6 +95,14 @@ const Home: React.FC = () => {
 
   // Actions popover state
   const [showActionsPopover, setShowActionsPopover] = useState(false);
+
+  // Weight tracking state
+  const [showWeightModal, setShowWeightModal] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number>(1);
+  const [weightDate, setWeightDate] = useState("");
+  const [weight, setWeight] = useState("");
+  const [goal, setGoal] = useState("");
+  const [isLoadingWeightData, setIsLoadingWeightData] = useState(false);
 
   // Available colors for sheet themes
   const availableColors = [
@@ -169,6 +194,132 @@ const Home: React.FC = () => {
     setShowColorModal(true);
   };
 
+  // Weight tracking functions
+  const fetchAndFillWeightData = async (dayNumber: number) => {
+    setIsLoadingWeightData(true);
+    try {
+      console.log("Fetching weight data for day:", dayNumber);
+      const data = await AppGeneral.getWeightData(dayNumber);
+
+      if (data) {
+        console.log("Retrieved data:", data);
+
+        // Auto-fill the form with existing data
+        if (data.date) {
+          // Convert date format if needed (assuming it's stored in a readable format)
+          const dateStr = data.date.toString();
+          // Try to parse the date and convert to YYYY-MM-DD format
+          let formattedDate = "";
+          try {
+            // Handle various date formats
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+              formattedDate = date.toISOString().split("T")[0];
+            } else {
+              // If it's already in YYYY-MM-DD format or other format
+              formattedDate = dateStr;
+            }
+          } catch (e) {
+            formattedDate = dateStr;
+          }
+          setWeightDate(formattedDate);
+        } else {
+          // Set today's date as default if no date exists
+          const today = new Date().toISOString().split("T")[0];
+          setWeightDate(today);
+        }
+
+        setWeight(data.weight?.toString() || "");
+        setGoal(data.goal?.toString() || "");
+
+        console.log("Form auto-filled with existing data");
+      } else {
+        console.log("No existing data found, using defaults");
+        // Set defaults if no data exists
+        const today = new Date().toISOString().split("T")[0];
+        setWeightDate(today);
+        setWeight("");
+        setGoal("");
+      }
+    } catch (error) {
+      console.error("Error fetching weight data:", error);
+      // Set defaults on error
+      const today = new Date().toISOString().split("T")[0];
+      setWeightDate(today);
+      setWeight("");
+      setGoal("");
+    } finally {
+      setIsLoadingWeightData(false);
+    }
+  };
+
+  const openWeightModal = async () => {
+    setShowWeightModal(true);
+    // Fetch and auto-fill data for the currently selected day
+    await fetchAndFillWeightData(selectedDay);
+  };
+
+  const handleDayChange = async (dayNumber: number) => {
+    setSelectedDay(dayNumber);
+    // Auto-fill data when day changes
+    if (showWeightModal) {
+      await fetchAndFillWeightData(dayNumber);
+    }
+  };
+
+  const handleTodayButton = () => {
+    const today = new Date().toISOString().split("T")[0];
+    setWeightDate(today);
+  };
+
+  const handleAddWeight = async () => {
+    try {
+      if (!weight || !goal) {
+        setToastMessage("Please enter both weight and goal values");
+        setToastColor("warning");
+        setShowToast(true);
+        return;
+      }
+
+      if (!weightDate) {
+        setToastMessage("Please select a date");
+        setToastColor("warning");
+        setShowToast(true);
+        return;
+      }
+
+      // Validate weight and goal are numbers
+      const weightNum = parseFloat(weight);
+      const goalNum = parseFloat(goal);
+
+      if (isNaN(weightNum) || isNaN(goalNum)) {
+        setToastMessage("Weight and goal must be valid numbers");
+        setToastColor("warning");
+        setShowToast(true);
+        return;
+      }
+
+      await AppGeneral.addWeight(selectedDay, weightDate, weightNum, goalNum);
+
+      setToastMessage(`Weight data added for Day ${selectedDay}!`);
+      setToastColor("success");
+      setShowToast(true);
+
+      // Reset form
+      setShowWeightModal(false);
+      setWeight("");
+      setGoal("");
+      setSelectedDay(1);
+      const today = new Date().toISOString().split("T")[0];
+      setWeightDate(today);
+    } catch (error) {
+      console.error("Error adding weight data:", error);
+      setToastMessage("Failed to add weight data");
+      setToastColor("danger");
+      setShowToast(true);
+    }
+  };
+
   const executeSaveAsWithFilename = async (filename: string) => {
     updateSelectedFile(filename);
 
@@ -216,7 +367,7 @@ const Home: React.FC = () => {
           console.log("Loaded existing default file from local storage");
         } else {
           // If no default file exists, initialize with template data and save it
-          const data = DATA["home"]["default"]["msc"];
+          const data = DATA["home"][device]["msc"];
           AppGeneral.initializeApp(JSON.stringify(data));
 
           // Save the initial template as the default file
@@ -237,7 +388,7 @@ const Home: React.FC = () => {
         }
 
         // Fallback to template initialization
-        const data = DATA["home"]["default"]["msc"];
+        const data = DATA["home"][device]["msc"];
         AppGeneral.initializeApp(JSON.stringify(data));
         AppGeneral.changeSheetColor("#000000");
       }
@@ -392,7 +543,7 @@ const Home: React.FC = () => {
     }
   }, [isDarkMode, activeFontColor]);
 
-  const footers = DATA["home"]["default"]["footers"];
+  const footers = DATA["home"][device]["footers"];
   const footersList = footers.map((footerArray) => {
     const isActive = footerArray.index === billType;
 
@@ -472,6 +623,34 @@ const Home: React.FC = () => {
             slot="end"
             className={isPlatform("desktop") && "ion-padding-end"}
           >
+            {/* PWA Status Indicators */}
+            <IonIcon
+              icon={isOnline ? wifiOutline : cloudDownloadOutline}
+              size="small"
+              style={{
+                cursor: "pointer",
+                marginRight: "8px",
+                color: isOnline ? "#28ba62" : "#f04141",
+              }}
+              title={isOnline ? "Online" : "Offline"}
+            />
+            {isInstallable && !isInstalled && (
+              <IonIcon
+                icon={downloadOutline}
+                size="small"
+                onClick={installApp}
+                style={{
+                  cursor: "pointer",
+                  marginRight: "8px",
+                  color: "#ffffff",
+                }}
+                title="Install App"
+              />
+            )}
+            {/* Wallet Connection */}
+            <div style={{ marginRight: "12px" }}>
+              {/* <WalletConnection /> */}
+            </div>
             <IonIcon
               icon={textOutline}
               size="large"
@@ -732,6 +911,147 @@ const Home: React.FC = () => {
             </div>
           </IonContent>
         </IonModal>
+
+        {/* Weight Tracking Modal */}
+        <IonModal
+          isOpen={showWeightModal}
+          onDidDismiss={() => setShowWeightModal(false)}
+        >
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>Add Weight Data</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setShowWeightModal(false)}>
+                  <IonIcon icon={closeOutline} />
+                </IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent>
+            <div style={{ padding: "16px" }}>
+              {isLoadingWeightData && (
+                <div style={{ textAlign: "center", padding: "20px" }}>
+                  <IonSpinner />
+                  <p
+                    style={{
+                      marginTop: "10px",
+                      color: "var(--ion-color-medium)",
+                    }}
+                  >
+                    Loading weight data...
+                  </p>
+                </div>
+              )}
+
+              <IonItem>
+                <IonLabel position="stacked">Day (1-7)</IonLabel>
+                <IonSelect
+                  value={selectedDay}
+                  onIonChange={(e) => handleDayChange(e.detail.value)}
+                  disabled={isLoadingWeightData}
+                >
+                  <IonSelectOption value={1}>Day 1</IonSelectOption>
+                  <IonSelectOption value={2}>Day 2</IonSelectOption>
+                  <IonSelectOption value={3}>Day 3</IonSelectOption>
+                  <IonSelectOption value={4}>Day 4</IonSelectOption>
+                  <IonSelectOption value={5}>Day 5</IonSelectOption>
+                  <IonSelectOption value={6}>Day 6</IonSelectOption>
+                  <IonSelectOption value={7}>Day 7</IonSelectOption>
+                </IonSelect>
+              </IonItem>
+
+              <IonItem>
+                <IonLabel position="stacked">Date</IonLabel>
+                <input
+                  type="date"
+                  value={weightDate}
+                  onChange={(e) => setWeightDate(e.target.value)}
+                  disabled={isLoadingWeightData}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    border: "none",
+                    outline: "none",
+                    background: "transparent",
+                    fontSize: "16px",
+                    opacity: isLoadingWeightData ? 0.5 : 1,
+                  }}
+                />
+                <IonButton
+                  slot="end"
+                  fill="clear"
+                  onClick={handleTodayButton}
+                  disabled={isLoadingWeightData}
+                >
+                  <IonIcon icon={todayOutline} />
+                  Today
+                </IonButton>
+              </IonItem>
+
+              <IonItem>
+                <IonLabel position="stacked">Weight</IonLabel>
+                <IonInput
+                  type="number"
+                  step="0.1"
+                  placeholder="Enter weight (kg)"
+                  value={weight}
+                  onIonInput={(e) => setWeight(e.detail.value!)}
+                  disabled={isLoadingWeightData}
+                />
+              </IonItem>
+
+              <IonItem>
+                <IonLabel position="stacked">Goal</IonLabel>
+                <IonInput
+                  type="number"
+                  step="0.1"
+                  placeholder="Enter goal weight (kg)"
+                  value={goal}
+                  onIonInput={(e) => setGoal(e.detail.value!)}
+                  disabled={isLoadingWeightData}
+                />
+              </IonItem>
+
+              <div style={{ marginTop: "24px" }}>
+                <IonButton
+                  expand="block"
+                  onClick={handleAddWeight}
+                  disabled={
+                    !weight || !goal || !weightDate || isLoadingWeightData
+                  }
+                >
+                  <IonIcon icon={scaleOutline} slot="start" />
+                  Add Weight Data
+                </IonButton>
+              </div>
+
+              {weight && goal && (
+                <IonCard style={{ marginTop: "16px" }}>
+                  <IonCardContent>
+                    <p>
+                      <strong>Preview:</strong>
+                    </p>
+                    <p>Day: {selectedDay}</p>
+                    <p>Date: {weightDate}</p>
+                    <p>Weight: {weight} kg</p>
+                    <p>Goal: {goal} kg</p>
+                    <p>
+                      From Goal:{" "}
+                      {(parseFloat(weight) - parseFloat(goal)).toFixed(1)} kg
+                    </p>
+                  </IonCardContent>
+                </IonCard>
+              )}
+            </div>
+          </IonContent>
+        </IonModal>
+
+        {/* Weight Tracking FAB */}
+        <IonFab vertical="bottom" horizontal="end" slot="fixed">
+          <IonFabButton onClick={openWeightModal}>
+            <IonIcon icon={add} />
+          </IonFabButton>
+        </IonFab>
 
         <Menu showM={showMenu} setM={() => setShowMenu(false)} />
       </IonContent>

@@ -23,19 +23,6 @@ export const selectInputText = (inputElement: HTMLIonInputElement) => {
   }
 };
 
-// Add a helper function to clean server filenames
-export const cleanServerFilename = (filename: string): string => {
-  // Remove "server_" prefix if it exists
-  let cleanName = filename.startsWith("server_")
-    ? filename.substring(7)
-    : filename;
-
-  // Remove ".json" extension if it exists
-  cleanName = cleanName.endsWith(".json") ? cleanName.slice(0, -5) : cleanName;
-
-  return cleanName;
-};
-
 // Helper function to check if the default file has user content or is just empty/template
 export const isDefaultFileEmpty = (content: string): boolean => {
   try {

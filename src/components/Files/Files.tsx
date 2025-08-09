@@ -10,50 +10,20 @@ import {
   IonLabel,
   IonAlert,
   IonItemGroup,
-  IonBadge,
-  IonSpinner,
   IonToast,
-  IonSegment,
-  IonSegmentButton,
-  IonContent,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonPage,
   IonSearchbar,
-  IonButton,
-  IonInput,
-  IonCard,
-  IonCardContent,
-  IonCardHeader,
-  IonCardTitle,
-  IonModal,
-  IonFab,
-  IonFabButton,
   IonSelect,
   IonSelectOption,
 } from "@ionic/react";
 import {
   trash,
-  key,
   documentText,
-  cloudOutline,
-  server,
-  logIn,
-  personAdd,
-  download,
-  folderOpen,
-  cloudUpload,
-  close,
   swapVertical,
   create,
 } from "ionicons/icons";
-import { useTheme } from "../../contexts/ThemeContext";
 import { useHistory } from "react-router-dom";
-import { cloudService, ServerFile } from "../../services/cloud-service";
 import { useInvoice } from "../../contexts/InvoiceContext";
 import {
-  cleanServerFilename,
   formatDateForFilename,
   isQuotaExceededError,
   getQuotaExceededMessage,
@@ -66,15 +36,11 @@ const Files: React.FC<{
   updateBillType: Function;
 }> = (props) => {
   const { selectedFile, updateSelectedFile } = useInvoice();
-  const { isDarkMode } = useTheme();
   const history = useHistory();
 
   const [showAlert1, setShowAlert1] = useState(false);
   const [currentKey, setCurrentKey] = useState<string | null>(null);
-  const [showServerDeleteAlert, setShowServerDeleteAlert] = useState(false);
-  const [currentServerFile, setCurrentServerFile] = useState<ServerFile | null>(
-    null
-  );
+
   const [device] = useState(AppGeneral.getDeviceType());
 
   const [showRenameAlert, setShowRenameAlert] = useState(false);
@@ -82,28 +48,20 @@ const Files: React.FC<{
   const [currentRenameKey, setCurrentRenameKey] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
-  const [fileSource, setFileSource] = useState<"local" | "server">("local");
+  const [fileSource, setFileSource] = useState<"local">("local");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<
     "name" | "date" | "dateCreated" | "dateModified"
   >("dateModified");
   const [fileListContent, setFileListContent] = useState<React.ReactNode>(null);
 
-  // Server files state
-  const [serverFiles, setServerFiles] = useState<ServerFile[]>([]);
   const [serverFilesLoading, setServerFilesLoading] = useState(false);
 
-  const [deletingFile, setDeletingFile] = useState<number | null>(null);
-  const [isSavingAllToServer, setIsSavingAllToServer] = useState(false);
-  const [saveAllProgress, setSaveAllProgress] = useState("");
-  const [saveAllCount, setSaveAllCount] = useState({ current: 0, total: 0 });
-  const [isMovingAllToLocal, setIsMovingAllToLocal] = useState(false);
-  const [moveAllProgress, setMoveAllProgress] = useState("");
-  const [moveAllCount, setMoveAllCount] = useState({ current: 0, total: 0 });
+  // Blockchain state removed - local-only mode
 
   const handleSaveUnsavedChanges = async () => {
     // Save Default File Changes if not already saved
-    if (selectedFile === "default" && key !== "default") {
+    if (selectedFile === "default" && props.file !== "default") {
       try {
         const defaultExists = await props.store._checkKey("default");
         if (defaultExists) {
@@ -111,7 +69,7 @@ const Files: React.FC<{
 
           // Decode the stored content
           const storedContent = decodeURIComponent(storedDefaultFile.content);
-          const msc = DATA["home"]["default"]["msc"];
+          const msc = DATA["home"][device]["msc"];
 
           const hasUnsavedChanges = storedContent !== JSON.stringify(msc);
           if (hasUnsavedChanges) {
@@ -230,12 +188,6 @@ const Files: React.FC<{
   const deleteFile = (key: string) => {
     setShowAlert1(true);
     setCurrentKey(key);
-  };
-
-  // Delete server file (with confirmation)
-  const deleteServerFile = (file: ServerFile) => {
-    setShowServerDeleteAlert(true);
-    setCurrentServerFile(file);
   };
 
   // Load default file
@@ -408,437 +360,6 @@ const Files: React.FC<{
         "";
       return fileName.includes(searchTerm);
     });
-  };
-
-  // Server files functions
-  const loadServerFiles = async () => {
-    if (!cloudService.isAuthenticated()) return;
-
-    setServerFilesLoading(true);
-    try {
-      const response = await cloudService.getFiles();
-      console.log("Server files loaded:", response);
-      setServerFiles(response.files);
-    } catch (error) {
-      setToastMessage("Failed to load server files");
-      setShowToast(true);
-    } finally {
-      setServerFilesLoading(false);
-    }
-  };
-
-  const handleFileDownload = async (file: ServerFile) => {
-    try {
-      const blob = await cloudService.downloadFileByName(file.filename);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = file.filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      setToastMessage("File downloaded successfully");
-      setShowToast(true);
-    } catch (error) {
-      setToastMessage(
-        error instanceof Error ? error.message : "Download failed"
-      );
-      setShowToast(true);
-    }
-  };
-
-  const handleFileDelete = async (fileId: number) => {
-    setDeletingFile(fileId);
-    try {
-      // Find the file by ID to get its filename
-      const file = serverFiles.find((f) => f.id === fileId);
-      if (!file) {
-        throw new Error("File not found");
-      }
-
-      await cloudService.deleteFileByName(file.filename);
-      setToastMessage("File deleted successfully");
-      setShowToast(true);
-      loadServerFiles();
-    } catch (error) {
-      setToastMessage(error instanceof Error ? error.message : "Delete failed");
-      setShowToast(true);
-    } finally {
-      setDeletingFile(null);
-    }
-  };
-
-  const handleMoveToLocal = async (file: ServerFile) => {
-    try {
-      setToastMessage("Moving file to local storage...");
-      setShowToast(true);
-
-      // Download the file from server
-      const blob = await cloudService.downloadFileByName(file.filename);
-
-      // Convert blob to text
-      const fileData = await blob.text();
-
-      if (fileData && file.filename) {
-        const localFileName = file.filename;
-        const encodedContent = encodeURIComponent(fileData);
-        console.log("Creating local file with:", {
-          fileName: localFileName,
-          contentLength: fileData.length,
-          encodedContentLength: encodedContent.length,
-          billType: 1,
-        });
-
-        // Validate the filename (basic check)
-        if (!localFileName || localFileName.trim() === "") {
-          setToastMessage("Invalid filename. Cannot move to local storage.");
-          setShowToast(true);
-          return;
-        }
-
-        // Check if file already exists locally
-        const fileExists = await props.store._checkKey(localFileName);
-        if (fileExists) {
-          setToastMessage(
-            `File "${localFileName}" already exists in local storage.`
-          );
-          setShowToast(true);
-          return;
-        }
-
-        // Create a local file
-        const now = new Date().toISOString();
-        const localFile = new LocalFile(
-          now,
-          now,
-          encodedContent, // Use URL-encoded content
-          localFileName, // Use filename as is
-          1,
-          false // isEncrypted = false for server files
-        );
-
-        console.log("Local file created:", {
-          name: localFile.name,
-          contentLength: localFile.content.length,
-          billType: localFile.billType,
-          created: localFile.created,
-          modified: localFile.modified,
-        });
-
-        // Save to local storage
-        await props.store._saveFile(localFile);
-        console.log("File saved to local storage successfully");
-
-        // Verify the file was saved correctly
-        const savedData = await props.store._getFile(localFileName);
-        console.log("Verification - saved file data:", {
-          name: savedData.name,
-          contentLength: savedData.content?.length,
-          billType: savedData.billType,
-          hasContent: !!savedData.content,
-        });
-
-        setToastMessage(`File moved to local storage as ${localFile.name}`);
-        setShowToast(true);
-
-        // Refresh the file list
-        await renderFileList();
-      } else {
-        console.error("Invalid file structure:", fileData);
-        setToastMessage("Invalid file format. Cannot move to local storage.");
-        setShowToast(true);
-      }
-    } catch (error) {
-      console.error("Error moving file to local storage:", error);
-
-      // Check if the error is due to storage quota exceeded
-      if (isQuotaExceededError(error)) {
-        setToastMessage(getQuotaExceededMessage("moving files from server"));
-      } else {
-        setToastMessage("Failed to move file to local storage");
-      }
-      setShowToast(true);
-    }
-  };
-
-  // Save all local files to server
-  const handleSaveAllToServer = async () => {
-    if (!cloudService.isAuthenticated()) {
-      setToastMessage("Please login to save files to server");
-      setShowToast(true);
-      return;
-    }
-
-    try {
-      setIsSavingAllToServer(true);
-      setSaveAllProgress("Preparing to save all files...");
-
-      // Get all local files and exclude the default file
-      const localFiles = await props.store._getAllFiles();
-      const filesArray = Object.keys(localFiles).filter(
-        (key) => key !== "default"
-      );
-
-      if (filesArray.length === 0) {
-        setToastMessage("No local files to save");
-        setShowToast(true);
-        return;
-      }
-
-      setSaveAllCount({ current: 0, total: filesArray.length });
-      setSaveAllProgress(`Saving 0 of ${filesArray.length} files...`);
-
-      let successCount = 0;
-      let errorCount = 0;
-      const errors: string[] = [];
-
-      for (let i = 0; i < filesArray.length; i++) {
-        const fileName = filesArray[i];
-        setSaveAllCount({ current: i + 1, total: filesArray.length });
-        setSaveAllProgress(
-          `Saving ${i + 1} of ${filesArray.length} files: ${fileName}`
-        );
-
-        try {
-          // Get file data
-          const fileData = await props.store._getFile(fileName);
-          if (!fileData || !fileData.content) {
-            errors.push(`${fileName} (empty or corrupted)`);
-            errorCount++;
-            continue;
-          }
-
-          let contentToUpload: string;
-
-          // Check if this is the currently selected/active file
-          // If so, get the live content from the spreadsheet instead of stored content
-          if (selectedFile === fileName) {
-            try {
-              // Get current live content from the spreadsheet (like Menu.tsx does)
-              contentToUpload = AppGeneral.getSpreadsheetContent();
-              console.log(`Using live content for active file: ${fileName}`);
-            } catch (error) {
-              console.log(
-                `Failed to get live content for ${fileName}, using stored content`
-              );
-              // Fallback to stored content if getting live content fails
-              contentToUpload = decodeURIComponent(fileData.content);
-            }
-          } else {
-            // For non-active files, use the stored content (decode it first)
-            contentToUpload = decodeURIComponent(fileData.content);
-          }
-
-          // Upload to server using the existing service
-          // Create a File object from the content
-          const fileBlob = new Blob([contentToUpload], {
-            type: "application/json",
-          });
-          const fileObject = new globalThis.File([fileBlob], fileName, {
-            type: "application/json",
-          });
-
-          await cloudService.uploadFile(fileObject);
-
-          successCount++;
-          console.log(`Successfully saved ${fileName} to server`);
-        } catch (error) {
-          errorCount++;
-          errors.push(
-            `${fileName} (${
-              error instanceof Error ? error.message : "unknown error"
-            })`
-          );
-          console.error(`Error saving ${fileName} to server:`, error);
-        }
-
-        // Small delay to prevent overwhelming the server
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      }
-
-      // Show completion message
-      let message = `Save complete: ${successCount} files saved successfully`;
-      if (errorCount > 0) {
-        message += `, ${errorCount} failed`;
-        if (errors.length <= 3) {
-          message += `\nFailed files: ${errors.join(", ")}`;
-        } else {
-          message += `\nFirst 3 failed files: ${errors
-            .slice(0, 3)
-            .join(", ")}... and ${errors.length - 3} more`;
-        }
-      }
-
-      setToastMessage(message);
-      setShowToast(true);
-
-      // Refresh server files if we're viewing them
-      if (fileSource === "server") {
-        await loadServerFiles();
-      }
-    } catch (error) {
-      console.error("Error in save all to server:", error);
-      setToastMessage("Failed to save files to server");
-      setShowToast(true);
-    } finally {
-      setIsSavingAllToServer(false);
-      setSaveAllProgress("");
-      setSaveAllCount({ current: 0, total: 0 });
-    }
-  };
-
-  // Move all server files to local storage
-  const handleMoveAllToLocal = async () => {
-    if (!cloudService.isAuthenticated()) {
-      setToastMessage("Please login to access server files");
-      setShowToast(true);
-      return;
-    }
-
-    try {
-      setIsMovingAllToLocal(true);
-      setMoveAllProgress("Preparing to move all files...");
-
-      // Get all server files - all files are now invoice files
-      const invoiceFiles = serverFiles;
-
-      if (invoiceFiles.length === 0) {
-        setToastMessage("No invoice files found on server to move");
-        setShowToast(true);
-        return;
-      }
-
-      setMoveAllCount({ current: 0, total: invoiceFiles.length });
-      setMoveAllProgress(`Moving 0 of ${invoiceFiles.length} files...`);
-
-      let successCount = 0;
-      let errorCount = 0;
-      const errors: string[] = [];
-
-      for (let i = 0; i < invoiceFiles.length; i++) {
-        const file = invoiceFiles[i];
-        setMoveAllCount({ current: i + 1, total: invoiceFiles.length });
-        setMoveAllProgress(
-          `Moving ${i + 1} of ${invoiceFiles.length} files: ${file.filename}`
-        );
-
-        try {
-          // Download the file from server
-          const blob = await cloudService.downloadFileByName(file.filename);
-          const text = await blob.text();
-          const fileData = JSON.parse(text);
-
-          // Check if this is a valid server invoice file
-          if (
-            fileData.content &&
-            fileData.fileName &&
-            fileData.billType !== undefined
-          ) {
-            // Use the filename as is (no server_ prefix removal needed)
-            const localFileName = fileData.fileName;
-
-            // Validate the filename
-            if (!localFileName || localFileName.trim() === "") {
-              errors.push(`${file.filename} (invalid filename)`);
-              errorCount++;
-              continue;
-            }
-
-            // Check if file already exists locally
-            const fileExists = await props.store._checkKey(localFileName);
-            if (fileExists) {
-              errors.push(`${localFileName} (already exists locally)`);
-              errorCount++;
-              continue;
-            }
-
-            // The content from server is raw content, encode it for local storage
-            const encodedContent = encodeURIComponent(fileData.content);
-
-            // Create a local file
-            const now = new Date().toISOString();
-            const localFile = new LocalFile(
-              now,
-              now,
-              encodedContent,
-              localFileName,
-              fileData.billType,
-              false // isEncrypted = false for server files
-            );
-
-            // Save to local storage
-            await props.store._saveFile(localFile);
-            successCount++;
-            console.log(
-              `Successfully moved ${file.filename} to local storage as ${localFileName}`
-            );
-          } else {
-            errors.push(`${file.filename} (invalid file format)`);
-            errorCount++;
-            continue;
-          }
-        } catch (error) {
-          errorCount++;
-
-          // Check if the error is due to storage quota exceeded
-          if (isQuotaExceededError(error)) {
-            errors.push(`${file.filename} (storage quota exceeded)`);
-
-            // If quota exceeded, show immediate feedback and stop the operation
-            setMoveAllProgress("Operation stopped: Storage quota exceeded");
-            setToastMessage(
-              getQuotaExceededMessage("continuing the bulk move operation")
-            );
-            setShowToast(true);
-
-            // Break out of the loop to stop further processing
-            break;
-          } else {
-            errors.push(
-              `${file.filename} (${
-                error instanceof Error ? error.message : "unknown error"
-              })`
-            );
-          }
-
-          console.error(
-            `Error moving ${file.filename} to local storage:`,
-            error
-          );
-        }
-
-        // Small delay to prevent overwhelming the system
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      }
-
-      // Show completion message
-      let message = `Move complete: ${successCount} files moved successfully`;
-      if (errorCount > 0) {
-        message += `, ${errorCount} failed`;
-        if (errors.length <= 3) {
-          message += `\nFailed files: ${errors.join(", ")}`;
-        } else {
-          message += `\nFirst 3 failed files: ${errors
-            .slice(0, 3)
-            .join(", ")}... and ${errors.length - 3} more`;
-        }
-      }
-
-      setToastMessage(message);
-      setShowToast(true);
-
-      // Refresh the file list to show the new local files
-      await renderFileList();
-    } catch (error) {
-      console.error("Error in move all to local:", error);
-      setToastMessage("Failed to move files to local storage");
-      setShowToast(true);
-    } finally {
-      setIsMovingAllToLocal(false);
-      setMoveAllProgress("");
-      setMoveAllCount({ current: 0, total: 0 });
-    }
   };
 
   // Validation function (adapted from Menu.tsx)
@@ -1151,223 +672,6 @@ const Files: React.FC<{
           );
         }
       }
-    } else if (fileSource === "server") {
-      if (!cloudService.isAuthenticated()) {
-        content = (
-          <IonCard>
-            <IonCardHeader>
-              <IonCardTitle>Server Files</IonCardTitle>
-            </IonCardHeader>
-            <IonCardContent>
-              <p>Please login to access your server files.</p>
-            </IonCardContent>
-          </IonCard>
-        );
-      } else {
-        if (serverFilesLoading) {
-          content = (
-            <IonList style={{ border: "none" }} lines="none">
-              <IonItem style={{ "--border-width": "0px" }}>
-                <IonSpinner name="circular" slot="start" />
-                <IonLabel>Loading server files...</IonLabel>
-              </IonItem>
-            </IonList>
-          );
-        } else if (serverFiles.length === 0) {
-          content = (
-            <IonList style={{ border: "none" }} lines="none">
-              <IonItem style={{ "--border-width": "0px" }}>
-                <IonLabel>
-                  {searchQuery.trim()
-                    ? `No files found matching "${searchQuery}"`
-                    : "No server files found"}
-                </IonLabel>
-              </IonItem>
-            </IonList>
-          );
-        } else {
-          const filteredFiles = filterFilesBySearch(serverFiles, searchQuery);
-          if (filteredFiles.length === 0) {
-            content = (
-              <IonList style={{ border: "none" }} lines="none">
-                <IonItem style={{ "--border-width": "0px" }}>
-                  <IonLabel>
-                    {searchQuery.trim()
-                      ? `No files found matching "${searchQuery}"`
-                      : "No server files found"}
-                  </IonLabel>
-                </IonItem>
-              </IonList>
-            );
-          } else {
-            const mappedFiles = filteredFiles.map((file) => ({
-              ...file,
-              date: file.created_at,
-              name: file.filename,
-            }));
-            const sortedFiles = sortFiles(mappedFiles, sortBy);
-
-            if (sortBy === "name") {
-              // For name sorting, show files in a simple list without date grouping
-              content = (
-                <IonList style={{ border: "none" }} lines="none">
-                  {sortedFiles.map((file) => {
-                    const isDeleting = deletingFile === file.id;
-                    return (
-                      <IonItemGroup key={`server-${file.id}`}>
-                        <IonItem
-                          className="mobile-file-item"
-                          style={{
-                            "--border-width": "0px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <IonIcon
-                            icon={server}
-                            slot="start"
-                            className="file-icon server-icon"
-                          />
-                          <IonLabel className="mobile-file-label">
-                            <h3>{file.filename}</h3>
-                            <p>Server file • {_formatDate(file.created_at)}</p>
-                            <p>Size: {(file.file_size / 1024).toFixed(2)} KB</p>
-                          </IonLabel>
-                          <div
-                            slot="end"
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "6px",
-                            }}
-                          >
-                            <IonIcon
-                              icon={download}
-                              color="success"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMoveToLocal(file);
-                              }}
-                              title="Move to Local Storage"
-                              style={{
-                                fontSize: "24px",
-                                cursor: "pointer",
-                              }}
-                            />
-                            <IonIcon
-                              icon={trash}
-                              color="danger"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteServerFile(file);
-                              }}
-                              style={{
-                                fontSize: "24px",
-                                cursor: "pointer",
-                                opacity: isDeleting ? 0.5 : 1,
-                              }}
-                            />
-                            {isDeleting && <IonSpinner name="circular" />}
-                          </div>
-                        </IonItem>
-                      </IonItemGroup>
-                    );
-                  })}
-                </IonList>
-              );
-            } else {
-              // For date and recent sorting, group by date
-              const groupedFiles = groupFilesByDate(sortedFiles, sortBy);
-              content = (
-                <IonList style={{ border: "none" }} lines="none">
-                  {Object.entries(groupedFiles).map(([dateHeader, files]) => (
-                    <div key={`server-group-${dateHeader}`}>
-                      <IonItem
-                        color="light"
-                        className="date-header-item"
-                        style={{ "--border-width": "0px" }}
-                      >
-                        <IonLabel>
-                          <h2
-                            className="date-header-text"
-                            style={{ color: "var(--ion-color-primary)" }}
-                          >
-                            {dateHeader}
-                          </h2>
-                        </IonLabel>
-                      </IonItem>
-                      {(files as any[]).map((file) => {
-                        const isDeleting = deletingFile === file.id;
-                        return (
-                          <IonItemGroup key={`server-${file.id}`}>
-                            <IonItem
-                              className="mobile-file-item"
-                              style={{
-                                "--border-width": "0px",
-                                cursor: "pointer",
-                              }}
-                            >
-                              <IonIcon
-                                icon={server}
-                                slot="start"
-                                className="file-icon server-icon"
-                              />
-                              <IonLabel className="mobile-file-label">
-                                <h3>{file.filename}</h3>
-                                <p>
-                                  Server file • {_formatDate(file.created_at)}
-                                </p>
-                                <p>
-                                  Size: {(file.file_size / 1024).toFixed(2)} KB
-                                </p>
-                              </IonLabel>
-                              <div
-                                slot="end"
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "6px",
-                                }}
-                              >
-                                <IonIcon
-                                  icon={download}
-                                  color="success"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleMoveToLocal(file);
-                                  }}
-                                  title="Move to Local Storage"
-                                  style={{
-                                    fontSize: "24px",
-                                    cursor: "pointer",
-                                  }}
-                                />
-                                <IonIcon
-                                  icon={trash}
-                                  color="danger"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteServerFile(file);
-                                  }}
-                                  style={{
-                                    fontSize: "24px",
-                                    cursor: "pointer",
-                                    opacity: isDeleting ? 0.5 : 1,
-                                  }}
-                                />
-                                {isDeleting && <IonSpinner name="circular" />}
-                              </div>
-                            </IonItem>
-                          </IonItemGroup>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </IonList>
-              );
-            }
-          }
-        }
-      }
     }
     setFileListContent(content);
   };
@@ -1375,33 +679,12 @@ const Files: React.FC<{
   useEffect(() => {
     renderFileList();
     // eslint-disable-next-line
-  }, [
-    props.file,
-    fileSource,
-    searchQuery,
-    sortBy,
-    serverFiles,
-    serverFilesLoading,
-  ]);
-
-  useEffect(() => {
-    if (fileSource === "server" && cloudService.isAuthenticated()) {
-      loadServerFiles();
-    }
-  }, [fileSource]);
+  }, [props.file, fileSource, searchQuery, sortBy, serverFilesLoading]);
 
   // Reset sort option when switching file sources to ensure compatibility
   useEffect(() => {
-    if (fileSource === "server") {
-      // For server files, only "date" and "name" are available
-      if (sortBy === "dateCreated" || sortBy === "dateModified") {
-        setSortBy("date");
-      }
-    } else {
-      // For local files, if coming from server and using "date", switch to "dateModified"
-      if (sortBy === "date") {
-        setSortBy("dateModified");
-      }
+    if (sortBy === "date") {
+      setSortBy("dateModified");
     }
   }, [fileSource]);
 
@@ -1418,15 +701,7 @@ const Files: React.FC<{
                 }`}
                 onClick={() => setFileSource("local")}
               >
-                🏠 Local Files
-              </button>
-              <button
-                className={`custom-tab-button ${
-                  fileSource === "server" ? "active" : ""
-                }`}
-                onClick={() => setFileSource("server")}
-              >
-                ☁️ Server Files
+                🏠 Your Files
               </button>
             </div>
           </div>
@@ -1493,101 +768,6 @@ const Files: React.FC<{
               </div>
             </div>
           </div>
-          {fileSource === "local" && cloudService.isAuthenticated() && (
-            <div
-              style={{
-                padding: "0 16px 8px 16px",
-                display: "flex",
-                gap: "8px",
-                alignItems: "center",
-                maxWidth: "800px",
-                margin: "0 auto",
-              }}
-            >
-              <IonButton
-                size="small"
-                fill="solid"
-                color="primary"
-                onClick={handleSaveAllToServer}
-                disabled={isSavingAllToServer}
-              >
-                <IonIcon icon={cloudUpload} slot="start" />
-                {isSavingAllToServer ? "Saving..." : "Save All to Server"}
-              </IonButton>
-              {isSavingAllToServer && (
-                <div
-                  style={{ fontSize: "12px", color: "var(--ion-color-medium)" }}
-                >
-                  {saveAllProgress}
-                  {saveAllCount.total > 0 && (
-                    <span>
-                      {" "}
-                      ({saveAllCount.current}/{saveAllCount.total})
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          {fileSource === "local" && !cloudService.isAuthenticated() && (
-            <div
-              style={{
-                padding: "0 16px 8px 16px",
-                display: "flex",
-                gap: "8px",
-                alignItems: "center",
-                maxWidth: "800px",
-                margin: "0 auto",
-              }}
-            >
-              <IonButton size="small" fill="outline" color="medium" disabled>
-                <IonIcon icon={cloudUpload} slot="start" />
-                Save All to Server (Login Required)
-              </IonButton>
-            </div>
-          )}
-          {fileSource === "server" && cloudService.isAuthenticated() && (
-            <div
-              style={{
-                padding: "0 16px 8px 16px",
-                display: "flex",
-                gap: "8px",
-                alignItems: "center",
-                flexWrap: "wrap",
-                maxWidth: "800px",
-                margin: "0 auto",
-              }}
-            >
-              <IonButton
-                size="small"
-                fill="solid"
-                color="secondary"
-                onClick={handleMoveAllToLocal}
-                disabled={isMovingAllToLocal}
-              >
-                <IonIcon icon={download} slot="start" />
-                {isMovingAllToLocal ? "Moving..." : "Move All to Local"}
-              </IonButton>
-              {isMovingAllToLocal && (
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: "var(--ion-color-medium)",
-                    width: "100%",
-                    marginTop: "4px",
-                  }}
-                >
-                  {moveAllProgress}
-                  {moveAllCount.total > 0 && (
-                    <span>
-                      {" "}
-                      ({moveAllCount.current}/{moveAllCount.total})
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
         </div>
         <div
           className="files-scrollable-container"
@@ -1622,29 +802,7 @@ const Files: React.FC<{
           },
         ]}
       />
-      <IonAlert
-        animated
-        isOpen={showServerDeleteAlert}
-        onDidDismiss={() => setShowServerDeleteAlert(false)}
-        header="Delete server file"
-        message={
-          currentServerFile
-            ? `Do you want to delete the "${currentServerFile.filename}" file from the server?`
-            : "Do you want to delete this file from the server?"
-        }
-        buttons={[
-          { text: "No", role: "cancel" },
-          {
-            text: "Yes",
-            handler: async () => {
-              if (currentServerFile) {
-                await handleFileDelete(currentServerFile.id);
-                setCurrentServerFile(null);
-              }
-            },
-          },
-        ]}
-      />
+
       <IonAlert
         animated
         isOpen={showRenameAlert}

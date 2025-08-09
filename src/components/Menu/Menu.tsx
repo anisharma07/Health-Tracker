@@ -3,7 +3,7 @@ import * as AppGeneral from "../socialcalc/index.js";
 import { File, Local } from "../Storage/LocalStorage";
 import { isPlatform, IonToast, IonLoading } from "@ionic/react";
 import { EmailComposer } from "capacitor-email-composer";
-import { Printer } from "@ionic-native/printer";
+import { Printer } from "@bcyesil/capacitor-plugin-printer";
 import { IonActionSheet, IonAlert } from "@ionic/react";
 import {
   saveOutline,
@@ -15,7 +15,6 @@ import {
   documentOutline,
   documents,
   key,
-  server,
 } from "ionicons/icons";
 import { APP_NAME, DATA } from "../../app-data";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -26,7 +25,6 @@ import { exportCSV, parseSocialCalcCSV } from "../../services/exportAsCsv";
 import { Share } from "@capacitor/share";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import MenuDialogs from "./MenuDialogs.js";
-import { cloudService } from "../../services/cloud-service.js";
 
 const Menu: React.FC<{
   showM: boolean;
@@ -44,16 +42,13 @@ const Menu: React.FC<{
   const [showAlert8, setShowAlert8] = useState(false); // For export all PDF filename
   const [showAlert9, setShowAlert9] = useState(false); // For password protection
   const [showAlert10, setShowAlert10] = useState(false); // For password input when loading
-  const [showAlert12, setShowAlert12] = useState(false); // For server PDF filename
   const [showToast1, setShowToast1] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingCSV, setIsGeneratingCSV] = useState(false);
   const [isExportingAllPDF, setIsExportingAllPDF] = useState(false);
-  const [isGeneratingServerPDF, setIsGeneratingServerPDF] = useState(false);
   const [pdfProgress, setPdfProgress] = useState("");
   const [exportAllProgress, setExportAllProgress] = useState("");
-  const [serverPdfProgress, setServerPdfProgress] = useState("");
   const [passwordProtect, setPasswordProtect] = useState(false);
   const [filePassword, setFilePassword] = useState("");
   const [device] = useState(AppGeneral.getDeviceType());
@@ -94,16 +89,33 @@ const Menu: React.FC<{
     return filename;
   };
 
-  const doPrint = () => {
+  const doPrint = async () => {
     if (isPlatform("hybrid")) {
-      const printer = Printer;
-      printer.print(AppGeneral.getCurrentHTMLContent());
+      try {
+        const htmlContent = AppGeneral.getCurrentHTMLContent();
+
+        await Printer.print({
+          content: htmlContent,
+          name: selectedFile || "Invoice",
+          orientation: "portrait",
+        });
+
+        setToastMessage("Print job sent successfully!");
+        setShowToast1(true);
+      } catch (error) {
+        console.error("Print error:", error);
+        setToastMessage(
+          "Failed to print. Please check if a printer is available."
+        );
+        setShowToast1(true);
+      }
     } else {
       const content = AppGeneral.getCurrentHTMLContent();
-      // useReactToPrint({ content: () => content });
       const printWindow = window.open("/printwindow", "Print Invoice");
-      printWindow.document.write(content);
-      printWindow.print();
+      if (printWindow) {
+        printWindow.document.write(content);
+        printWindow.print();
+      }
     }
   };
 
@@ -505,11 +517,15 @@ const Menu: React.FC<{
       for (const imgUrl of imgArr) {
         console.log("trying to convert to base64:", imgUrl);
         if (typeof imgUrl === "string") {
-          const parts = imgUrl.split("/");
-          const base64Response = await cloudService.convertUrlToBase64(
-            "/logos/" + parts[parts.length - 1]
+          // Server conversion disabled - using placeholder
+          // const parts = imgUrl.split("/");
+          // const base64Response = await cloudService.convertUrlToBase64(
+          //   "/logos/" + parts[parts.length - 1]
+          // );
+          // urlReplace.push(base64Response.data_url);
+          urlReplace.push(
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
           );
-          urlReplace.push(base64Response.data_url);
         } else {
           urlReplace.push("0");
         }
@@ -533,9 +549,9 @@ const Menu: React.FC<{
             const base64Url = urlReplace[imgIndex];
             imgIndex++;
 
-            // Skip this img tag if base64Url is "0"
+            // Keep the img tag unchanged if base64Url is "0"
             if (base64Url === "0") {
-              return ""; // Remove the entire img tag
+              return fullMatch; // Return the original img tag without changes
             }
 
             // Replace the src attribute with the base64 data URL
@@ -552,142 +568,6 @@ const Menu: React.FC<{
     return htmlContent;
   };
 
-  /**
-   * Generate PDF on server using HTML to PDF API
-   * This function sends the current spreadsheet content as HTML to the server
-   * where it gets converted to PDF and returns it directly for download
-   */
-  const doGenerateServerPDF = async (filename?: string) => {
-    try {
-      setIsGeneratingServerPDF(true);
-      setServerPdfProgress("Preparing content for server PDF generation...");
-      console.log("Generating server PDF with filename:", filename);
-
-      if (!cloudService.isAuthenticated()) {
-        setToastMessage(
-          "You're not logged in. Please login to use this feature."
-        );
-        setShowToast1(true);
-        setIsGeneratingServerPDF(false);
-        return;
-      }
-
-      // Get the current HTML content from the spreadsheet
-      const rawHtmlContent = AppGeneral.getCurrentHTMLContent();
-      const htmlContent = await urlsToBase64(rawHtmlContent);
-
-      if (!htmlContent || htmlContent.trim() === "") {
-        setToastMessage("No content available to export as PDF");
-        setShowToast1(true);
-        setIsGeneratingServerPDF(false);
-        return;
-      }
-
-      const pdfFilename = filename || selectedFile || "invoice";
-
-      setServerPdfProgress("Converting HTML to PDF on server...");
-      console.log("PDF Filename:", pdfFilename);
-      // Generate PDF using the new direct conversion API
-      const pdfBlob = await cloudService.convertHTMLToPDF(htmlContent, {
-        filename: `${pdfFilename}.pdf`,
-        pdfOptions: {
-          "page-size": "A4",
-          "margin-top": "0.75in",
-          "margin-right": "0.75in",
-          "margin-bottom": "0.75in",
-          "margin-left": "0.75in",
-          orientation: "portrait",
-        },
-      });
-      console.log("PDF Blob received from server:", pdfBlob);
-
-      setServerPdfProgress("Processing PDF for download...");
-
-      // Check if we're on a mobile device
-      if (isPlatform("hybrid") || isPlatform("mobile")) {
-        try {
-          // Convert blob to base64 for sharing on mobile
-          const reader = new FileReader();
-          reader.onloadend = async () => {
-            const base64Data = reader.result as string;
-            const base64 = base64Data.split(",")[1]; // Remove data:application/pdf;base64, prefix
-
-            try {
-              // Save to temporary file
-              const tempFile = await Filesystem.writeFile({
-                path: `${pdfFilename}.pdf`,
-                data: base64,
-                directory: Directory.Cache,
-              });
-
-              // Share the file
-              await Share.share({
-                title: `${pdfFilename}.pdf`,
-                text: "Server generated PDF ready to share",
-                url: tempFile.uri,
-                dialogTitle: "Share Server PDF",
-              });
-
-              setToastMessage(`Server PDF generated and ready to share!`);
-              setShowToast1(true);
-            } catch (shareError) {
-              console.log("Error sharing server PDF:", shareError);
-              // Fallback to direct download
-              const url = URL.createObjectURL(pdfBlob);
-              const link = document.createElement("a");
-              link.href = url;
-              link.download = `${pdfFilename}.pdf`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              URL.revokeObjectURL(url);
-
-              setToastMessage(`Server PDF downloaded: ${pdfFilename}.pdf`);
-              setShowToast1(true);
-            }
-          };
-          reader.readAsDataURL(pdfBlob);
-        } catch (error) {
-          console.error("Error processing server PDF for sharing:", error);
-          // Fallback to direct download
-          const url = URL.createObjectURL(pdfBlob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `${pdfFilename}.pdf`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-
-          setToastMessage(`Server PDF downloaded: ${pdfFilename}.pdf`);
-          setShowToast1(true);
-        }
-      } else {
-        // Desktop behavior - direct download
-        const url = URL.createObjectURL(pdfBlob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${pdfFilename}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        setToastMessage(`Server PDF downloaded: ${pdfFilename}.pdf`);
-        setShowToast1(true);
-      }
-    } catch (error) {
-      console.error("Error generating server PDF:", error);
-      setToastMessage(
-        error.message || "Failed to generate PDF on server. Please try again."
-      );
-      setShowToast1(true);
-    } finally {
-      setIsGeneratingServerPDF(false);
-      setServerPdfProgress("");
-    }
-  };
-
   const showPDFNameDialog = () => {
     setShowAlert6(true);
   };
@@ -698,10 +578,6 @@ const Menu: React.FC<{
 
   const showExportAllPDFNameDialog = () => {
     setShowAlert8(true);
-  };
-
-  const showServerPDFNameDialog = () => {
-    setShowAlert12(true);
   };
 
   const sendEmail = () => {
@@ -751,17 +627,15 @@ const Menu: React.FC<{
   const getMenuButtons = () => {
     const baseButtons = [];
 
-    // Only add print button for non-mobile devices
-    if (!isPlatform("mobile") && !isPlatform("hybrid")) {
-      baseButtons.push({
-        text: "Print",
-        icon: print,
-        handler: () => {
-          doPrint();
-          console.log("Print clicked");
-        },
-      });
-    }
+    // Add print button for all platforms
+    baseButtons.push({
+      text: "Print",
+      icon: print,
+      handler: () => {
+        doPrint();
+        console.log("Print clicked");
+      },
+    });
 
     // Add remaining buttons
     baseButtons.push(
@@ -787,14 +661,6 @@ const Menu: React.FC<{
         handler: () => {
           showExportAllPDFNameDialog();
           console.log("Export All Sheets as PDF clicked");
-        },
-      },
-      {
-        text: "Export as PDF via Server",
-        icon: cloudUpload,
-        handler: () => {
-          showServerPDFNameDialog();
-          console.log("Export as PDF via Server clicked");
         },
       }
       // {
@@ -830,7 +696,6 @@ const Menu: React.FC<{
         showAlert8={showAlert8}
         showAlert9={showAlert9}
         showAlert10={showAlert10}
-        showAlert12={showAlert12}
         // Alert setters
         setShowAlert1={setShowAlert1}
         setShowAlert2={setShowAlert2}
@@ -841,7 +706,6 @@ const Menu: React.FC<{
         setShowAlert8={setShowAlert8}
         setShowAlert9={setShowAlert9}
         setShowAlert10={setShowAlert10}
-        setShowAlert12={setShowAlert12}
         // Toast states
         showToast1={showToast1}
         setShowToast1={setShowToast1}
@@ -854,12 +718,9 @@ const Menu: React.FC<{
         setIsGeneratingCSV={setIsGeneratingCSV}
         isExportingAllPDF={isExportingAllPDF}
         setIsExportingAllPDF={setIsExportingAllPDF}
-        isGeneratingServerPDF={isGeneratingServerPDF}
-        setIsGeneratingServerPDF={setIsGeneratingServerPDF}
         // Progress messages
         pdfProgress={pdfProgress}
         exportAllProgress={exportAllProgress}
-        serverPdfProgress={serverPdfProgress}
         // Data for dialogs
         selectedFile={selectedFile}
         filePassword={filePassword}
@@ -867,7 +728,6 @@ const Menu: React.FC<{
         doGeneratePDF={doGeneratePDF}
         doGenerateCSV={doGenerateCSV}
         doExportAllSheetsAsPDF={doExportAllSheetsAsPDF}
-        doGenerateServerPDF={doGenerateServerPDF}
         generateInvoiceFilename={generateInvoiceFilename}
         selectInputText={selectInputText}
       />

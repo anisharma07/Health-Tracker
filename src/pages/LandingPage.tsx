@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   IonButton,
   IonContent,
@@ -19,21 +19,31 @@ import {
 } from "@ionic/react";
 import {
   medicalOutline,
-  timeOutline,
-  notificationsOutline,
+  scaleOutline,
+  nutritionOutline,
   analyticsOutline,
-  cloudOutline,
+  calendarOutline,
   shieldCheckmarkOutline,
   arrowForward,
   checkmarkCircle,
+  heartOutline,
+  timeOutline,
 } from "ionicons/icons";
 import { useHistory } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
+// import { cloudService } from "../services/cloud-service";
 import "./LandingPage.css";
 
 const LandingPage: React.FC = () => {
   const { isDarkMode } = useTheme();
   const history = useHistory();
+
+  // Check authentication status on component mount
+  useEffect(() => {
+    // if (cloudService.isAuthenticated()) {
+    //   history.push("/app/editor");
+    // }
+  }, [history]);
 
   const handleGetStarted = () => {
     history.push("/app/editor");
@@ -42,51 +52,52 @@ const LandingPage: React.FC = () => {
   const features = [
     {
       icon: medicalOutline,
-      title: "Medication Management",
+      title: "Medication Tracking",
       description:
-        "Track all your medications, dosages, and schedules in one place",
+        "Track medications, dosages, and schedules with smart reminders and alerts",
     },
     {
-      icon: timeOutline,
-      title: "Smart Reminders",
-      description: "Never miss a dose with intelligent notification system",
+      icon: scaleOutline,
+      title: "Weight Monitoring",
+      description:
+        "Monitor weight progress with goal tracking and visual charts",
+    },
+    {
+      icon: nutritionOutline,
+      title: "Diet Management",
+      description: "Log meals, track calories, and monitor nutritional intake",
     },
     {
       icon: analyticsOutline,
       title: "Health Analytics",
-      description: "Monitor your medication adherence and health trends",
+      description: "Comprehensive insights and trends for your health data",
     },
     {
-      icon: cloudOutline,
-      title: "Cloud Sync",
+      icon: calendarOutline,
+      title: "Schedule Management",
       description:
-        "Access your data anywhere with secure cloud synchronization",
+        "Organize medication schedules and health appointments efficiently",
     },
     {
-      icon: shieldCheckmarkOutline,
-      title: "Privacy First",
-      description: "Your health data is encrypted and completely private",
-    },
-    {
-      icon: notificationsOutline,
-      title: "Multi-Platform",
-      description: "Available on mobile, tablet, and desktop platforms",
+      icon: heartOutline,
+      title: "Health Goals",
+      description: "Set and track personalized health and wellness goals",
     },
   ];
 
   const benefits = [
-    "Reduce medication errors by up to 80%",
-    "Improve treatment adherence",
-    "Share reports with healthcare providers",
-    "Track side effects and symptoms",
-    "Manage multiple family members",
+    "Track medications with 95% adherence improvement",
+    "Monitor weight progress with visual goal tracking",
+    "Log daily nutrition and dietary habits",
+    "Generate comprehensive health reports",
+    "Set personalized health and wellness goals",
   ];
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>MedTracker Pro</IonTitle>
+          <IonTitle>Health & Wellness Tracker</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -98,16 +109,16 @@ const LandingPage: React.FC = () => {
               <IonCol size="12" sizeMd="8" sizeLg="6">
                 <div className="hero-content">
                   <div className="hero-icon">
-                    <IonIcon icon={medicalOutline} />
+                    <IonIcon icon={heartOutline} />
                   </div>
                   <h1 className="hero-title">
                     Take Control of Your
-                    <span className="highlight"> Medication Journey</span>
+                    <span className="highlight"> Health Journey</span>
                   </h1>
                   <p className="hero-subtitle">
-                    A comprehensive platform to track, manage, and optimize your
-                    medication routine. Built for patients, caregivers, and
-                    healthcare professionals.
+                    A comprehensive health tracking solution designed to help
+                    you monitor medications, track weight progress, and manage
+                    your diet. Stay on top of your wellness goals with ease.
                   </p>
                   <div className="cta-buttons">
                     <IonButton
@@ -116,11 +127,11 @@ const LandingPage: React.FC = () => {
                       className="primary-cta"
                       onClick={handleGetStarted}
                     >
-                      Get Started Free
+                      Start Health Tracking
                       <IonIcon icon={arrowForward} slot="end" />
                     </IonButton>
                     <IonText className="trial-text">
-                      <small>No credit card required • 30-day free trial</small>
+                      <small>Secure • Private • Easy to Use</small>
                     </IonText>
                   </div>
                 </div>
@@ -135,10 +146,10 @@ const LandingPage: React.FC = () => {
             <IonRow>
               <IonCol size="12">
                 <div className="section-header">
-                  <h2>Powerful Features for Better Health Management</h2>
+                  <h2>Complete Health Management Suite</h2>
                   <p>
-                    Everything you need to stay on top of your medication
-                    regimen
+                    Everything you need to track and improve your health and
+                    wellness journey
                   </p>
                 </div>
               </IonCol>
@@ -167,10 +178,11 @@ const LandingPage: React.FC = () => {
             <IonRow className="ion-align-items-center">
               <IonCol size="12" sizeLg="6">
                 <div className="benefits-content">
-                  <h2>Why Choose MedTracker Pro?</h2>
+                  <h2>Why Choose Our Health Tracking Platform?</h2>
                   <p className="benefits-intro">
-                    Join thousands of users who have improved their medication
-                    management and health outcomes with our platform.
+                    Join thousands of users who have transformed their health
+                    habits with our comprehensive, easy-to-use tracking
+                    platform.
                   </p>
                   <div className="benefits-list">
                     {benefits.map((benefit, index) => (
@@ -185,20 +197,20 @@ const LandingPage: React.FC = () => {
               <IonCol size="12" sizeLg="6">
                 <div className="stats-grid">
                   <div className="stat-card">
-                    <h3>50K+</h3>
+                    <h3>10K+</h3>
                     <p>Active Users</p>
                   </div>
                   <div className="stat-card">
-                    <h3>99.9%</h3>
-                    <p>Uptime</p>
+                    <h3>95%</h3>
+                    <p>Medication Adherence</p>
                   </div>
                   <div className="stat-card">
                     <h3>24/7</h3>
-                    <p>Support</p>
+                    <p>Health Tracking</p>
                   </div>
                   <div className="stat-card">
-                    <h3>4.9★</h3>
-                    <p>User Rating</p>
+                    <h3>100%</h3>
+                    <p>Privacy Protected</p>
                   </div>
                 </div>
               </IonCol>
@@ -213,10 +225,10 @@ const LandingPage: React.FC = () => {
               <IonCol size="12" sizeMd="8">
                 <IonCard className="cta-card">
                   <IonCardContent>
-                    <h2>Ready to Transform Your Health Management?</h2>
+                    <h2>Ready to Transform Your Health Journey?</h2>
                     <p>
-                      Start your free trial today and experience the difference
-                      organized medication tracking can make.
+                      Start tracking your medications, weight, and diet today
+                      with our comprehensive health management platform.
                     </p>
                     <IonButton
                       expand="block"
@@ -224,13 +236,13 @@ const LandingPage: React.FC = () => {
                       className="cta-button"
                       onClick={handleGetStarted}
                     >
-                      Start Free Trial
+                      Access Health Tracker
                       <IonIcon icon={arrowForward} slot="end" />
                     </IonButton>
                     <div className="feature-chips">
-                      <IonChip>Free 30-day trial</IonChip>
-                      <IonChip>No setup fees</IonChip>
-                      <IonChip>Cancel anytime</IonChip>
+                      <IonChip>Medication Reminders</IonChip>
+                      <IonChip>Weight Tracking</IonChip>
+                      <IonChip>Diet Management</IonChip>
                     </div>
                   </IonCardContent>
                 </IonCard>
