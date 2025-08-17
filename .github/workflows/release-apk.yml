@@ -1,4 +1,4 @@
-name: 🚀 Automated APK Release
+name: Automated APK Release
 
 on:
   pull_request:
@@ -69,13 +69,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 🏗️ Checkout Repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: 🔍 Check for Existing Release
+      - name: Extract Repository Name
+        id: repo-name
+        run: |
+          REPO_NAME="${{ github.repository }}"
+          REPO_NAME_ONLY="${REPO_NAME##*/}"
+          echo "full=$REPO_NAME" >> $GITHUB_OUTPUT
+          echo "name=$REPO_NAME_ONLY" >> $GITHUB_OUTPUT
+          echo "Repository: $REPO_NAME"
+          echo "App name: $REPO_NAME_ONLY"
+
+      - name: Check for Existing Release
         id: check-existing
         run: |
           # Get current version first
@@ -124,13 +134,47 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🔧 Setup Node.js
+      - name: Detect Package Manager
+        id: package-manager
+        run: |
+          # Detect package manager based on lock files
+          if [ -f "pnpm-lock.yaml" ]; then
+            echo "manager=pnpm" >> $GITHUB_OUTPUT
+            echo "lockfile=pnpm-lock.yaml" >> $GITHUB_OUTPUT
+            echo "cache-path=~/.pnpm-store" >> $GITHUB_OUTPUT
+            echo "install-cmd=pnpm install --frozen-lockfile" >> $GITHUB_OUTPUT
+            echo "run-cmd=pnpm run" >> $GITHUB_OUTPUT
+            echo "📦 Detected package manager: pnpm"
+          elif [ -f "yarn.lock" ]; then
+            echo "manager=yarn" >> $GITHUB_OUTPUT
+            echo "lockfile=yarn.lock" >> $GITHUB_OUTPUT
+            echo "cache-path=~/.yarn/cache" >> $GITHUB_OUTPUT
+            echo "install-cmd=yarn install --frozen-lockfile" >> $GITHUB_OUTPUT
+            echo "run-cmd=yarn" >> $GITHUB_OUTPUT
+            echo "📦 Detected package manager: yarn"
+          elif [ -f "package-lock.json" ]; then
+            echo "manager=npm" >> $GITHUB_OUTPUT
+            echo "lockfile=package-lock.json" >> $GITHUB_OUTPUT
+            echo "cache-path=~/.npm" >> $GITHUB_OUTPUT
+            echo "install-cmd=npm ci" >> $GITHUB_OUTPUT
+            echo "run-cmd=npm run" >> $GITHUB_OUTPUT
+            echo "📦 Detected package manager: npm"
+          else
+            echo "manager=npm" >> $GITHUB_OUTPUT
+            echo "lockfile=none" >> $GITHUB_OUTPUT
+            echo "cache-path=~/.npm" >> $GITHUB_OUTPUT
+            echo "install-cmd=npm install" >> $GITHUB_OUTPUT
+            echo "run-cmd=npm run" >> $GITHUB_OUTPUT
+            echo "📦 No lock file found, defaulting to npm"
+          fi
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
-      - name: 💾 Cache node_modules
+      - name: Cache node_modules
         uses: actions/cache@v4
         with:
           path: |
@@ -140,35 +184,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-npm-
 
-      - name: ☕ Setup Java JDK
+      - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
 
-      - name: 📦 Install Dependencies
+      - name: Install Dependencies
         run: |
-          echo "Installing dependencies with npm..."
-
-          # Check if package-lock.json exists
-          if [ -f "package-lock.json" ]; then
-            echo "package-lock.json found, using clean install"
-            npm ci
-          else
-            echo "No package-lock.json found, generating new one"
-            npm install
-          fi
-
+          echo "Installing dependencies with ${{ steps.package-manager.outputs.manager }}..."
+          ${{ steps.package-manager.outputs.install-cmd }}
           echo "✅ Dependencies installed successfully"
 
-      - name: �🔍 Get Current Version
+      - name: Get Current Version
         id: current-version
         run: |
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT_VERSION"
 
-      - name: 📈 Calculate New Version
+      - name: Calculate New Version
         id: new-version
         run: |
           CURRENT="${{ steps.current-version.outputs.current }}"
@@ -200,13 +235,23 @@ jobs:
           echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
 
-      - name: 📝 Update Version in Files
+      - name: Update Version in Files
         if: steps.check-existing.outputs.skip-build == 'false'
         run: |
           NEW_VERSION="${{ steps.new-version.outputs.new }}"
 
-          # Update package.json
-          npm version $NEW_VERSION --no-git-tag-version
+          # Update package.json version based on package manager
+          case "${{ steps.package-manager.outputs.manager }}" in
+            "pnpm")
+              pnpm version $NEW_VERSION --no-git-tag-version
+              ;;
+            "yarn")
+              yarn version --new-version $NEW_VERSION --no-git-tag-version
+              ;;
+            *)
+              npm version $NEW_VERSION --no-git-tag-version
+              ;;
+          esac
 
           # Update Android versionName and versionCode
           VERSION_CODE=$(grep "versionCode" android/app/build.gradle | grep -o '[0-9]\+')
@@ -217,7 +262,7 @@ jobs:
 
           echo "Updated version to $NEW_VERSION (code: $NEW_VERSION_CODE)"
 
-      - name: ⚠️ Release Already Exists
+      - name: Release Already Exists
         if: steps.check-existing.outputs.skip-build == 'true'
         run: |
           echo "## ⚠️ Release Already Exists"
@@ -226,7 +271,7 @@ jobs:
           echo "1. Delete the existing tag and release, OR"
           echo "2. Increment the version manually and re-trigger"
 
-      - name: 🔑 Setup Keystore
+      - name: Setup Keystore
         if: steps.check-existing.outputs.skip-build == 'false'
         run: |
           # Create keystore.properties with base64 encoded keystore
@@ -240,12 +285,12 @@ jobs:
 
           echo "✅ Keystore configuration created"
 
-      - name: 🔨 Build Release APK
+      - name: Build Release APK
         if: steps.check-existing.outputs.skip-build == 'false'
         run: |
           # Build web assets first
           echo "🏗️ Building web assets..."
-          npm run build
+          ${{ steps.package-manager.outputs.run-cmd }} build
 
           # Sync with Capacitor
           echo "🔄 Syncing with Capacitor..."
@@ -263,15 +308,16 @@ jobs:
             exit 1
           fi
 
-          # Rename APK with version
+          # Rename APK with version and repo name
           NEW_VERSION="${{ steps.new-version.outputs.new }}"
-          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/Govt-Invoice-v${NEW_VERSION}.apk
+          REPO_NAME="${{ steps.repo-name.outputs.name }}"
+          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/${REPO_NAME}-v${NEW_VERSION}.apk
 
           # Get APK info
-          APK_SIZE=$(du -h app/build/outputs/apk/release/Govt-Invoice-v${NEW_VERSION}.apk | cut -f1)
+          APK_SIZE=$(du -h app/build/outputs/apk/release/${REPO_NAME}-v${NEW_VERSION}.apk | cut -f1)
           echo "✅ APK built successfully! Size: $APK_SIZE"
 
-      - name: 🏷️ Create Git Tag
+      - name: Create Git Tag
         if: steps.check-existing.outputs.skip-build == 'false'
         run: |
           NEW_VERSION="${{ steps.new-version.outputs.new }}"
@@ -284,7 +330,7 @@ jobs:
           git push origin main
           git push origin "v$NEW_VERSION"
 
-      - name: 📝 Generate Release Notes
+      - name: Generate Release Notes
         if: steps.check-existing.outputs.skip-build == 'false'
         id: release-notes
         run: |
@@ -324,22 +370,22 @@ jobs:
 
           echo "Release notes generated successfully"
 
-      - name: 🎉 Create GitHub Release
+      - name: Create GitHub Release
         if: steps.check-existing.outputs.skip-build == 'false'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.new-version.outputs.new }}
-          name: 🚀 Govt-Invoice v${{ steps.new-version.outputs.new }}
+          name: ${{ steps.repo-name.outputs.name }} v${{ steps.new-version.outputs.new }}
           body_path: release-notes.md
           files: |
-            android/app/build/outputs/apk/release/Govt-Invoice-v${{ steps.new-version.outputs.new }}.apk
+            android/app/build/outputs/apk/release/${{ steps.repo-name.outputs.name }}-v${{ steps.new-version.outputs.new }}.apk
           draft: false
           prerelease: false
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🧹 Cleanup
+      - name: Cleanup
         if: always()
         run: |
           # Remove sensitive files
@@ -347,11 +393,12 @@ jobs:
           rm -f android/temp-keystore.jks
           echo "🧹 Cleanup completed"
 
-      - name: 📱 Post-Release Summary
+      - name: Post-Release Summary
         if: steps.check-existing.outputs.skip-build == 'false'
         run: |
           NEW_VERSION="${{ steps.new-version.outputs.new }}"
-          APK_PATH="android/app/build/outputs/apk/release/Govt-Invoice-v${NEW_VERSION}.apk"
+          REPO_NAME="${{ steps.repo-name.outputs.name }}"
+          APK_PATH="android/app/build/outputs/apk/release/${REPO_NAME}-v${NEW_VERSION}.apk"
           APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
 
           echo "## 🎉 Release Summary"
@@ -365,7 +412,7 @@ jobs:
     if: failure() && needs.check-release-trigger.outputs.should-release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: 📢 Notify Build Failure
+      - name: Notify Build Failure
         run: |
           echo "❌ Release build failed for PR #${{ github.event.pull_request.number }}"
           echo "Please check the workflow logs and fix the issues."
