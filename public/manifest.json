@@ -1,15 +1,15 @@
 {
-  "short_name": "Invoice App",
-  "name": "Govt Invoice Billing App",
-  "description": "Government Invoice Billing Application - Create, manage and track invoices offline and online",
+  "short_name": "Health Tracker",
+  "name": "Health Tracker App",
+  "description": "Comprehensive Health Tracking Application - Monitor nutrition, weight, exercise and wellness goals",
   "icons": [
     {
-      "src": "favicon-16x16.png",
+      "src": "pwa-16x16.png",
       "sizes": "16x16",
       "type": "image/png"
     },
     {
-      "src": "favicon-32x32.png",
+      "src": "pwa-32x32.png",
       "sizes": "32x32",
       "type": "image/png"
     },
@@ -105,5 +105,10 @@
   "edge_side_panel": {
     "preferred_width": 480
   },
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"]
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ]
 }

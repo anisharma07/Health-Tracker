@@ -5,5 +5,5 @@ import {
 
 export default defineConfig({
   preset: minimal2023Preset,
-  images: ["public/favicon.png"],
+  images: ["public/pwa-512x512.png"],
 });

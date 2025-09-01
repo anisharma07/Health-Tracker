@@ -29,7 +29,7 @@
 }
 
 .hero-section::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -297,13 +297,18 @@
 }
 
 .cta-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 70%
+  );
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -361,32 +366,32 @@
   .hero-title {
     font-size: 2rem;
   }
-  
+
   .hero-subtitle {
     font-size: 1rem;
   }
-  
+
   .section-header h2 {
     font-size: 1.8rem;
   }
-  
+
   .benefits-content h2 {
     font-size: 1.8rem;
   }
-  
+
   .stats-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
-  
+
   .stat-card {
     padding: 1.5rem 1rem;
   }
-  
+
   .stat-card h3 {
     font-size: 1.5rem;
   }
-  
+
   .feature-chips {
     flex-direction: column;
     align-items: center;
@@ -397,17 +402,17 @@
   .hero-section {
     padding: 3rem 1rem;
   }
-  
+
   .features-section,
   .benefits-section,
   .cta-section {
     padding: 3rem 1rem;
   }
-  
+
   .hero-title {
     font-size: 1.8rem;
   }
-  
+
   .hero-icon {
     font-size: 3rem;
   }
