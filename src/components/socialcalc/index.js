@@ -20,7 +20,6 @@ export { SocialCalc };
 export * from "./modules/device.js";
 export * from "./modules/init.js";
 export * from "./modules/sheets.js";
-export * from "./modules/logos.js";
 export * from "./modules/history.js";
 export * from "./modules/formatting.js";
 export * from "./modules/listeners.js";
